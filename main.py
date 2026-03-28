@@ -72,13 +72,20 @@ async def serve_index():
 
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
+
+    parser = argparse.ArgumentParser(description="OllamaBuddy server")
+    parser.add_argument("--host", default=settings.host, help="Bind host (default: %(default)s)")
+    parser.add_argument("--port", type=int, default=settings.port, help="Bind port (default: %(default)s)")
+    parser.add_argument("--reload", action="store_true", default=settings.debug, help="Enable auto-reload")
+    args = parser.parse_args()
 
     uvicorn.run(
         "main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
         ws_ping_interval=20,
         ws_ping_timeout=20,
     )
