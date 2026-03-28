@@ -14,9 +14,9 @@ ollama>=0.4.0
 onnxruntime>=1.19.0
 
 # Audio processing
-numpy>=1.24.0,<2.0
+numpy>=1.24.0
 soundfile>=0.12.0
-scipy>=1.11.0,<2.0
+scipy>=1.11.0
 webrtcvad>=2.0.10
 
 # HTTP client (SearXNG + Kokoro download)
