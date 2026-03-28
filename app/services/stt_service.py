@@ -1,0 +1,94 @@
+import asyncio
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Callable, Optional
+
+import numpy as np
+
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class STTService:
+    def __init__(self):
+        self._model = None
+        self._lock = asyncio.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt")
+
+    async def initialize(self):
+        logger.info(f"Loading Whisper model: {settings.whisper_model}")
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(self._executor, self._load_model)
+        logger.info("Whisper model ready")
+
+    def _load_model(self):
+        from faster_whisper import WhisperModel
+
+        device = settings.whisper_device
+        if device == "auto":
+            try:
+                import torch
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+            except ImportError:
+                device = "cpu"
+
+        cache_dir = Path(settings.whisper_cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        self._model = WhisperModel(
+            settings.whisper_model,
+            device=device,
+            compute_type=settings.whisper_compute_type,
+            download_root=str(cache_dir),
+        )
+
+    def _transcribe_sync(
+        self,
+        audio_np: np.ndarray,
+        partial_cb: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Full transcription in one executor call — consumes generator in-thread."""
+        segments, _ = self._model.transcribe(
+            audio_np,
+            vad_filter=True,
+            word_timestamps=False,
+            language=None,      # auto-detect
+        )
+        parts: list[str] = []
+        for seg in segments:    # consume lazy generator HERE (not in async context)
+            text = seg.text.strip()
+            if not text:
+                continue
+            parts.append(text)
+            if partial_cb:
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.call_soon_threadsafe(partial_cb, text)
+                except Exception:
+                    pass
+        return " ".join(parts).strip()
+
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        on_partial: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """Transcribe raw Float32LE 16 kHz mono audio bytes."""
+        if not self._model:
+            raise RuntimeError("STT service not initialised")
+
+        audio_np = np.frombuffer(audio_bytes, dtype=np.float32).copy()
+        if len(audio_np) < 1600:   # < 0.1 s — skip
+            return ""
+
+        loop = asyncio.get_event_loop()
+        async with self._lock:
+            result = await loop.run_in_executor(
+                self._executor, self._transcribe_sync, audio_np, on_partial
+            )
+        return result
+
+
+stt_service = STTService()

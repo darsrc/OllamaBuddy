@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0d0d12">
+  <title>OllamaBuddy</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/animations.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════ TOP BAR ════════════════════════════════ -->
+<header class="top-bar" id="top-bar">
+  <div class="top-bar-left">
+    <button class="icon-btn" id="sidebar-toggle" title="Toggle sidebar" aria-label="Sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <span class="logo-text">OllamaBuddy</span>
+  </div>
+
+  <div class="top-bar-center">
+    <div class="status-pill" id="ollama-status">
+      <span class="status-dot" id="ollama-dot"></span>
+      <span id="ollama-label">Connecting…</span>
+    </div>
+    <div class="model-pill" id="model-pill">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+      <span id="active-model-name">–</span>
+    </div>
+  </div>
+
+  <div class="top-bar-right">
+    <div class="monitor-chip" title="CPU usage">
+      <span class="monitor-lbl">CPU</span>
+      <span class="monitor-val" id="cpu-val">–</span>
+      <canvas class="sparkline" id="cpu-spark" width="56" height="18"></canvas>
+    </div>
+    <div class="monitor-chip" title="RAM usage">
+      <span class="monitor-lbl">RAM</span>
+      <span class="monitor-val" id="ram-val">–</span>
+      <canvas class="sparkline" id="ram-spark" width="56" height="18"></canvas>
+    </div>
+    <button class="icon-btn" id="right-panel-toggle" title="Toggle settings panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <line x1="15" y1="3" x2="15" y2="21"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════ MAIN GRID ══════════════════════════════ -->
+<div class="main-grid">
+
+  <!-- ─── LEFT SIDEBAR ─────────────────────────────────────────────────── -->
+  <aside class="sidebar-left" id="sidebar-left">
+    <div class="sidebar-top">
+      <button class="new-chat-btn" id="new-chat-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        New Chat
+      </button>
+    </div>
+
+    <div class="conv-list-label">Recent</div>
+    <div class="conv-list" id="conv-list">
+      <div class="conv-list-empty">No conversations yet</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-action-btn" id="profile-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+        Profiles
+      </button>
+      <button class="sidebar-action-btn" id="settings-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        Settings
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── CENTER: TRANSCRIPT + INPUT ──────────────────────────────────── -->
+  <main class="center-panel" id="center-panel">
+
+    <!-- State indicator bar -->
+    <div class="state-bar" id="state-bar">
+      <span class="state-anim" id="state-anim"></span>
+      <span class="state-text" id="state-text">Ready</span>
+    </div>
+
+    <!-- Conversation transcript -->
+    <div class="transcript-scroll" id="transcript-scroll">
+      <div class="transcript-inner" id="transcript-inner">
+        <div class="welcome-card" id="welcome-card">
+          <div class="welcome-orb"></div>
+          <h2>OllamaBuddy</h2>
+          <p>Your local voice AI. Hold <strong>Mic</strong> to speak, or type below.</p>
+          <p class="welcome-hint">Powered by Ollama · faster-whisper · Kokoro TTS</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live partial transcript (shown while listening/transcribing) -->
+    <div class="live-bar" id="live-bar" hidden>
+      <span class="live-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        </svg>
+      </span>
+      <span class="live-text" id="live-text">Listening…</span>
+    </div>
+
+    <!-- Input area -->
+    <div class="input-area" id="input-area">
+      <!-- Capability toggles -->
+      <div class="cap-bar" id="cap-bar">
+        <button class="cap-btn active" id="cap-voice" data-cap="voice" title="Voice input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+          </svg>
+          <span>Voice</span>
+        </button>
+        <button class="cap-btn" id="cap-search" data-cap="search" title="Web search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <span>Search</span>
+        </button>
+        <button class="cap-btn" id="cap-voiceid" data-cap="voiceid" title="Speaker ID">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 12l2 2 4-4"/>
+            <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+          </svg>
+          <span>Speaker&nbsp;ID</span>
+        </button>
+      </div>
+
+      <!-- Text row -->
+      <div class="input-row">
+        <textarea
+          id="text-input"
+          class="text-input"
+          placeholder="Type a message…"
+          rows="1"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+        ></textarea>
+
+        <div class="input-btns">
+          <!-- Record (hold-to-talk) -->
+          <button class="record-btn" id="record-btn" aria-label="Hold to record">
+            <svg class="mic-svg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+              <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" stroke-width="2.2"/>
+              <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" stroke-width="2.2"/>
+            </svg>
+            <svg class="stop-svg" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+              <rect x="5" y="5" width="14" height="14" rx="2"/>
+            </svg>
+          </button>
+
+          <!-- Send -->
+          <button class="send-btn" id="send-btn" aria-label="Send" title="Send">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+          </button>
+
+          <!-- Interrupt (shown during generation) -->
+          <button class="interrupt-btn" id="interrupt-btn" aria-label="Stop" title="Stop" hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ─── RIGHT SIDEBAR ────────────────────────────────────────────────── -->
+  <aside class="sidebar-right" id="sidebar-right">
+
+    <!-- AI voice visualiser (top half) -->
+    <div class="viz-panel" id="viz-panel">
+      <canvas class="viz-canvas" id="viz-canvas"></canvas>
+      <div class="viz-label" id="viz-label">AI Voice</div>
+    </div>
+
+    <!-- Conversation & LLM settings (bottom half) -->
+    <div class="settings-panel" id="settings-panel">
+      <h3 class="sp-title">Conversation Settings</h3>
+
+      <div class="sp-group">
+        <label class="sp-label" for="model-select">Model</label>
+        <select class="sp-select" id="model-select">
+          <option value="">Loading…</option>
+        </select>
+      </div>
+
+      <div class="sp-group">
+        <label class="sp-label">
+          Temperature&nbsp;<span class="sp-val" id="temp-val">0.7</span>
+        </label>
+        <input type="range" class="sp-range" id="temperature" min="0" max="2" step="0.05" value="0.7">
+      </div>
+
+      <div class="sp-group">
+        <label class="sp-label" for="tts-voice">AI Voice</label>
+        <select class="sp-select" id="tts-voice">
+          <option value="af_heart">Heart (af)</option>
+          <option value="af_bella">Bella (af)</option>
+          <option value="am_adam">Adam (am)</option>
+          <option value="bm_george">George (bm)</option>
+        </select>
+      </div>
+
+      <div class="sp-group">
+        <label class="sp-label" for="tts-mode">TTS Mode</label>
+        <select class="sp-select" id="tts-mode">
+          <option value="punctuation" selected>Punctuation</option>
+          <option value="word">Word by word</option>
+          <option value="paragraph">Paragraph</option>
+        </select>
+      </div>
+
+      <div class="sp-group">
+        <label class="sp-label">
+          Speed&nbsp;<span class="sp-val" id="speed-val">1.0</span>×
+        </label>
+        <input type="range" class="sp-range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="sp-group">
+        <label class="sp-label" for="system-prompt">System Prompt</label>
+        <textarea class="sp-textarea" id="system-prompt" rows="3"
+          placeholder="You are a helpful assistant."></textarea>
+      </div>
+
+      <button class="apply-btn" id="apply-btn">Apply</button>
+    </div>
+  </aside>
+</div>
+
+<!-- ═══════════════════════════════ MODALS ════════════════════════════════ -->
+
+<!-- Profile modal -->
+<div class="modal-overlay" id="profile-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Profiles">
+    <div class="modal-header">
+      <h2>Profiles</h2>
+      <button class="modal-close" id="profile-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-list" id="profile-list"></div>
+      <button class="ghost-btn" id="add-profile-btn">+ Add Profile</button>
+      <div class="add-profile-form" id="add-profile-form" hidden>
+        <input type="text" class="modal-input" id="new-profile-name" placeholder="Your name">
+        <button class="primary-btn" id="create-profile-btn">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- App settings modal -->
+<div class="modal-overlay" id="app-settings-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal-header">
+      <h2>App Settings</h2>
+      <button class="modal-close" id="app-settings-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="sp-group">
+        <label class="sp-label" for="whisper-size">Whisper Model</label>
+        <select class="sp-select" id="whisper-size">
+          <option value="tiny">Tiny (fastest)</option>
+          <option value="base" selected>Base (default)</option>
+          <option value="small">Small</option>
+          <option value="medium">Medium</option>
+          <option value="large-v3">Large v3 (best)</option>
+        </select>
+      </div>
+      <div class="sp-group">
+        <label class="sp-label" for="ollama-url">Ollama Host</label>
+        <input type="text" class="sp-input" id="ollama-url" placeholder="http://localhost:11434">
+      </div>
+      <div class="sp-group">
+        <label class="sp-label" for="searxng-url">SearXNG URL</label>
+        <input type="text" class="sp-input" id="searxng-url" placeholder="http://localhost:8888">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Enrollment overlay -->
+<div class="enroll-overlay" id="enroll-overlay" hidden>
+  <div class="enroll-card">
+    <h3>Voice Enrollment</h3>
+    <p id="enroll-prompt">Hold the mic and read a short phrase (3 recordings)</p>
+    <div class="enroll-dots">
+      <span class="enroll-dot" id="edot-1"></span>
+      <span class="enroll-dot" id="edot-2"></span>
+      <span class="enroll-dot" id="edot-3"></span>
+    </div>
+    <button class="ghost-btn" id="cancel-enroll-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SCRIPTS ═══════════════════════════════ -->
+<script src="/static/js/wakelock.js"></script>
+<script src="/static/js/websocket.js"></script>
+<script src="/static/js/audio-capture.js"></script>
+<script src="/static/js/audio-playback.js"></script>
+<script src="/static/js/visualizer.js"></script>
+<script src="/static/js/transcript.js"></script>
+<script src="/static/js/monitor.js"></script>
+<script src="/static/js/conversations.js"></script>
+<script src="/static/js/profiles.js"></script>
+<script src="/static/js/settings.js"></script>
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>
