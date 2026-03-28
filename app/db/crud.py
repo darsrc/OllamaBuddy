@@ -94,6 +94,7 @@ async def update_conversation_title(db: AsyncSession, conv_id: str, title: str):
     conv = await get_conversation(db, conv_id)
     if conv:
         conv.title = title
+        conv.updated_at = datetime.utcnow()
         await db.commit()
 
 

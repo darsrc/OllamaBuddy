@@ -12,6 +12,7 @@ const Visualizer = (() => {
     const r = canvas.getBoundingClientRect();
     canvas.width  = r.width  * devicePixelRatio;
     canvas.height = r.height * devicePixelRatio;
+    ctx.resetTransform();
     ctx.scale(devicePixelRatio, devicePixelRatio);
   }
   new ResizeObserver(resize).observe(canvas);

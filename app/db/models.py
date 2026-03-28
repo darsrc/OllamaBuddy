@@ -31,7 +31,7 @@ class Conversation(Base):
     model = Column(String, default="qwen2.5:9b")
     system_prompt = Column(Text, default="You are a helpful assistant.")
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
     messages = relationship(
         "Message", back_populates="conversation", order_by="Message.created_at"

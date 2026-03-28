@@ -117,9 +117,11 @@ const Transcript = (() => {
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function hasPending(id) { return _pendingId === id; }
+
   return {
     addUserMessage, beginAssistantMessage, appendToken,
     finaliseAssistant, showToolCall, resolveToolCall,
-    setLiveText, clearLive, clear
+    setLiveText, clearLive, clear, hasPending
   };
 })();

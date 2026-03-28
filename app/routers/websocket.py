@@ -97,7 +97,6 @@ async def _dispatch_control(session, ws: WebSocket, msg: dict):
 
     elif t == "interrupt":
         await session_manager.interrupt_session(session.ws_id)
-        session.interrupt_event.clear()
         session.state = SessionState.IDLE
         await ws.send_json({"type": "interrupted"})
         await ws.send_json({"type": "state_change", "state": "idle"})
@@ -327,7 +326,6 @@ async def _identify_speaker(session, ws: WebSocket, audio: bytes):
 async def _run_turn(session, ws: WebSocket, text: str, speaker_match=None):
     if session.state not in (SessionState.IDLE, SessionState.TRANSCRIBING):
         return
-    session.interrupt_event.clear()
 
     session.llm_task = asyncio.create_task(
         llm_service.run_turn(

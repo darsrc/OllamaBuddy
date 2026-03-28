@@ -8,8 +8,12 @@ class Base(DeclarativeBase):
     pass
 
 
-# Convert sqlite:/// -> sqlite+aiosqlite:///
-_db_url = settings.db_path.replace("sqlite:///", "sqlite+aiosqlite:///")
+# Convert sqlite:/// -> sqlite+aiosqlite:/// (idempotent)
+_raw = settings.db_path
+if _raw.startswith("sqlite:///") and "aiosqlite" not in _raw:
+    _db_url = _raw.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+else:
+    _db_url = _raw
 
 engine = create_async_engine(_db_url, connect_args={"check_same_thread": False})
 

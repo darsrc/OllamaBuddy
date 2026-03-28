@@ -29,11 +29,6 @@ async def lifespan(app: FastAPI):
     logger.info("  OllamaBuddy starting up")
     logger.info("═" * 50)
 
-    # Ensure data directories exist
-    os.makedirs("data/voices", exist_ok=True)
-    os.makedirs("data/avatars", exist_ok=True)
-    os.makedirs("data/whisper_models", exist_ok=True)
-
     await init_db()
     logger.info("Database ready")
 
@@ -54,6 +49,11 @@ async def lifespan(app: FastAPI):
         pass
 
 
+# Create directories before FastAPI mounts them (StaticFiles checks at import time)
+os.makedirs("data/voices", exist_ok=True)
+os.makedirs("data/avatars", exist_ok=True)
+os.makedirs("data/whisper_models", exist_ok=True)
+
 app = FastAPI(title="OllamaBuddy", version="0.1.0", lifespan=lifespan)
 
 app.include_router(ws_router.router)
@@ -62,8 +62,6 @@ app.include_router(profiles.router, prefix="/api/profiles")
 app.include_router(models.router, prefix="/api/models")
 app.include_router(health.router, prefix="/api")
 
-# Serve avatar uploads and static frontend
-os.makedirs("data/avatars", exist_ok=True)
 app.mount("/data/avatars", StaticFiles(directory="data/avatars"), name="avatars")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

@@ -1,5 +1,7 @@
 /* Right sidebar settings + capability bar + state bar */
 const Settings = (() => {
+  let _ready = false;   // M6: guard against sending settings before session_ready
+
   // ── Right panel elements ─────────────────────────────────────────────────
   const modelSel    = document.getElementById('model-select');
   const tempRange   = document.getElementById('temperature');
@@ -51,6 +53,7 @@ const Settings = (() => {
   });
 
   function sendSettings() {
+    if (!_ready) return;
     WS.send({
       type: 'settings_update',
       model: modelSel.value,
@@ -84,6 +87,7 @@ const Settings = (() => {
     if (s.tts_speed != null) { speedRange.value = s.tts_speed; speedVal.textContent = (+s.tts_speed).toFixed(1); }
     if (s.system_prompt) sysPrompt.value = s.system_prompt;
     Monitor.setModel(s.model || '–');
+    _ready = true;
   }
 
   // ── State bar update ──────────────────────────────────────────────────────

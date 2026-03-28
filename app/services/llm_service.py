@@ -170,20 +170,20 @@ class LLMService:
             await ws.send_json(
                 {"type": "error", "code": "LLM_ERROR", "message": str(e)}
             )
-
-        # Flush remaining chunker buffer
-        if not session.interrupt_event.is_set():
-            tail = session.tts_chunker.flush()
-            if tail:
-                await session.tts_queue.put(tail)
-
-        # Sentinel — tells TTS consumer to stop
-        await session.tts_queue.put(None)
+        finally:
+            # C4: sentinel always fires — prevents _tts_consumer deadlock on error/cancel
+            if not session.interrupt_event.is_set():
+                tail = session.tts_chunker.flush()
+                if tail:
+                    await session.tts_queue.put(tail)
+            await session.tts_queue.put(None)
 
         full_text = "".join(full_tokens)
-        # Update in-memory history with assistant reply
-        if session.messages and session.messages[-1]["role"] == "user":
+        # H3: update history; roll back user message if no response produced
+        if full_text:
             session.messages.append({"role": "assistant", "content": full_text})
+        elif session.messages and session.messages[-1]["role"] == "user":
+            session.messages.pop()
 
         await ws.send_json(
             {"type": "llm_done", "message_id": message_id, "full_text": full_text}

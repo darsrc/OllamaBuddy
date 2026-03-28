@@ -43,6 +43,7 @@ class SessionManager:
             session.tts_task.cancel()
         if session.llm_task and not session.llm_task.done():
             session.llm_task.cancel()
+        session.interrupt_event.clear()   # C6: clear after drain so next turn starts clean
         session.state = SessionState.INTERRUPTED
 
     async def broadcast(self, message: dict):

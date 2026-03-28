@@ -37,6 +37,7 @@
   recordBtn.addEventListener('touchcancel',() => { if (AudioCapture.isRecording()) _stopRecording(); });
 
   // ── Text send ────────────────────────────────────────────────────────────
+  // C8: single handler — no pre-created bubble (bubble opens on first llm_token, C7)
   function _sendText() {
     const text = textInput.value.trim();
     if (!text) return;
@@ -130,6 +131,10 @@
   });
 
   WS.on('llm_token', msg => {
+    // C7: open bubble on first token if not already open (covers text_input path)
+    if (!Transcript.hasPending(msg.message_id)) {
+      Transcript.beginAssistantMessage(msg.message_id);
+    }
     Transcript.appendToken(msg.token, msg.message_id);
   });
 
@@ -180,28 +185,6 @@
         Transcript.finaliseAssistant(m.id || Math.random().toString(), m.content);
       }
     });
-  });
-
-  // text_input also needs an assistant bubble (server won't send transcript_final)
-  WS.on('state_change', msg => {
-    if (msg.state === 'llm_generating') {
-      // Only create bubble if there isn't already a pending one
-      // (transcript_final creates it for voice; text_input we handle on send)
-    }
-  });
-
-  // When user sends text we create the bubble immediately
-  const _origSendText = _sendText; // captured above
-  // Override send to also open assistant bubble
-  sendBtn.removeEventListener('click', _sendText);
-  sendBtn.addEventListener('click', () => {
-    const text = textInput.value.trim();
-    if (!text) return;
-    WS.send({ type: 'text_input', text });
-    Transcript.addUserMessage(text, null);
-    Transcript.beginAssistantMessage('text_' + Date.now());
-    textInput.value = '';
-    textInput.style.height = 'auto';
   });
 
   WS.on('error', msg => {

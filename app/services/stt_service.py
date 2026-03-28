@@ -47,33 +47,41 @@ class STTService:
     def _transcribe_sync(
         self,
         audio_np: np.ndarray,
-        partial_cb: Optional[Callable[[str], None]] = None,
+        partial_cb: Optional[Callable] = None,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> str:
         """Full transcription in one executor call — consumes generator in-thread."""
-        segments, _ = self._model.transcribe(
-            audio_np,
-            vad_filter=True,
-            word_timestamps=False,
-            language=None,      # auto-detect
-        )
+        # M5: fall back to no-VAD if webrtcvad is unavailable on this platform
+        try:
+            segments, _ = self._model.transcribe(
+                audio_np,
+                vad_filter=True,
+                word_timestamps=False,
+                language=None,
+            )
+        except Exception:
+            segments, _ = self._model.transcribe(
+                audio_np,
+                vad_filter=False,
+                word_timestamps=False,
+                language=None,
+            )
+
         parts: list[str] = []
-        for seg in segments:    # consume lazy generator HERE (not in async context)
+        for seg in segments:    # consume lazy generator IN-THREAD
             text = seg.text.strip()
             if not text:
                 continue
             parts.append(text)
-            if partial_cb:
-                try:
-                    loop = asyncio.get_event_loop()
-                    loop.call_soon_threadsafe(partial_cb, text)
-                except Exception:
-                    pass
+            # C5/H1: schedule the async coroutine properly from this thread
+            if partial_cb and loop:
+                asyncio.run_coroutine_threadsafe(partial_cb(text), loop)
         return " ".join(parts).strip()
 
     async def transcribe(
         self,
         audio_bytes: bytes,
-        on_partial: Optional[Callable[[str], None]] = None,
+        on_partial: Optional[Callable] = None,
     ) -> str:
         """Transcribe raw Float32LE 16 kHz mono audio bytes."""
         if not self._model:
@@ -85,9 +93,21 @@ class STTService:
 
         loop = asyncio.get_event_loop()
         async with self._lock:
-            result = await loop.run_in_executor(
-                self._executor, self._transcribe_sync, audio_np, on_partial
-            )
+            # H2: timeout so a hung Whisper call never locks the session forever
+            try:
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        self._executor,
+                        self._transcribe_sync,
+                        audio_np,
+                        on_partial,
+                        loop,
+                    ),
+                    timeout=60.0,
+                )
+            except asyncio.TimeoutError:
+                logger.error("STT transcription timed out after 60 s")
+                return ""
         return result
 
 

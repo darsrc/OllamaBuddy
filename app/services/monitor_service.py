@@ -4,6 +4,7 @@ import logging
 import httpx
 import psutil
 
+from app.session.manager import session_manager
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,6 @@ class MonitorService:
                 logger.error(f"Monitor tick error: {e}")
 
     async def _tick(self):
-        from app.session.manager import session_manager
-
         cpu = psutil.cpu_percent(interval=None)
         mem = psutil.virtual_memory()
 

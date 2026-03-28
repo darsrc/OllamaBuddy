@@ -66,7 +66,7 @@ registerProcessor('capture-processor', CaptureProcessor);
     };
 
     _sourceNode.connect(_workletNode);
-    _workletNode.connect(_ctx.destination);   // needed to keep worklet alive in some browsers
+    // C3: do NOT connect worklet to destination — that routes mic audio to speakers
 
     _recording = true;
     WS.send({ type: 'recording_start' });

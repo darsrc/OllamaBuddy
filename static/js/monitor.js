@@ -30,7 +30,8 @@ const Monitor = (() => {
 
     // Fill under line
     ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
-    ctx.fillStyle = color.replace(')', ',0.12)').replace('rgb', 'rgba');
+    const _inner = color.slice(color.indexOf('(') + 1, color.lastIndexOf(')'));
+    ctx.fillStyle = `rgba(${_inner},0.12)`;
     ctx.fill();
   }
 
