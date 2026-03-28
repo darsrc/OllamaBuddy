@@ -28,7 +28,7 @@ const Conversations = (() => {
       const dateStr = _fmtDate(d);
 
       el.innerHTML = `
-        <div class="conv-item-title" title="${_esc(c.title)}">${_esc(c.title)}</div>
+        <div class="conv-item-title" title="Double-click to rename">${_esc(c.title)}</div>
         <span class="conv-item-date">${dateStr}</span>
         <button class="conv-item-del" title="Delete" data-del="${c.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
@@ -36,14 +36,22 @@ const Conversations = (() => {
           </svg>
         </button>`;
 
+      // Load on click
       el.addEventListener('click', (e) => {
-        if (e.target.closest('[data-del]')) return;
+        if (e.target.closest('[data-del]') || e.target.closest('.conv-item-title-input')) return;
         _setActive(c.id);
         WS.send({ type: 'load_conversation', conversation_id: c.id });
-        // On mobile close sidebar
         document.getElementById('sidebar-left').classList.remove('open');
       });
 
+      // Rename on double-click
+      const titleEl = el.querySelector('.conv-item-title');
+      titleEl.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        _startRename(c, titleEl);
+      });
+
+      // Delete
       el.querySelector('[data-del]').addEventListener('click', async (e) => {
         e.stopPropagation();
         await fetch(`/api/conversations/${c.id}`, { method: 'DELETE' });
@@ -51,6 +59,40 @@ const Conversations = (() => {
       });
 
       list.appendChild(el);
+    });
+  }
+
+  function _startRename(conv, titleEl) {
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'conv-item-title conv-item-title-input';
+    inp.value = conv.title;
+    titleEl.replaceWith(inp);
+    inp.focus();
+    inp.select();
+
+    const _save = async () => {
+      const newTitle = inp.value.trim() || conv.title;
+      if (newTitle !== conv.title) {
+        await fetch(`/api/conversations/${conv.id}/title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle })
+        });
+        conv.title = newTitle;
+      }
+      // Restore span
+      const span = document.createElement('div');
+      span.className = 'conv-item-title';
+      span.title = 'Double-click to rename';
+      span.textContent = conv.title;
+      span.addEventListener('dblclick', e => { e.stopPropagation(); _startRename(conv, span); });
+      inp.replaceWith(span);
+    };
+    inp.addEventListener('blur', _save);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') inp.blur();
+      if (e.key === 'Escape') { inp.value = conv.title; inp.blur(); }
     });
   }
 
@@ -65,14 +107,14 @@ const Conversations = (() => {
 
   function prependNew(conv) {
     _active = conv.conversation_id || conv.id;
-    load(); // reload list to reflect new entry
+    load();
   }
 
   function _fmtDate(d) {
     const now = new Date();
     const diff = now - d;
-    if (diff < 60000)  return 'just now';
-    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 60000)   return 'just now';
+    if (diff < 3600000)  return Math.floor(diff / 60000) + 'm ago';
     if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }

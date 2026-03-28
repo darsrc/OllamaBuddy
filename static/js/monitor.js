@@ -41,9 +41,11 @@ const Monitor = (() => {
     ollamaDot.className = 'status-dot ' + s;
     ollamaLabel.textContent = s === 'connected' ? 'Ollama' : s;
 
-    // Resource values
+    // Resource values — show app process memory, system CPU
     cpuVal.textContent = msg.cpu_percent?.toFixed(0) + '%';
-    ramVal.textContent = msg.ram_percent?.toFixed(0) + '%';
+    ramVal.textContent = msg.proc_mem_mb != null
+      ? msg.proc_mem_mb.toFixed(0) + ' MB'
+      : msg.ram_percent?.toFixed(0) + '%';
 
     // Sparklines
     _drawSparkline(cpuSpark, msg.cpu_history || [], 'rgb(124,110,245)');

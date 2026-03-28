@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 import httpx
 import psutil
@@ -16,6 +17,8 @@ class MonitorService:
     def __init__(self):
         self.cpu_history: list[float] = [0.0] * HISTORY_LEN
         self.ram_history: list[float] = [0.0] * HISTORY_LEN
+        self._proc = psutil.Process(os.getpid())
+        self._proc.cpu_percent()  # discard first reading
         psutil.cpu_percent()    # discard first dummy reading (always 0.0)
 
     async def run_loop(self):
@@ -38,6 +41,14 @@ class MonitorService:
         self.ram_history.append(mem.percent)
         self.ram_history.pop(0)
 
+        # Process-specific metrics
+        try:
+            proc_mem_mb = round(self._proc.memory_info().rss / 1e6, 1)
+            proc_cpu = round(self._proc.cpu_percent(), 1)
+        except Exception:
+            proc_mem_mb = 0.0
+            proc_cpu = 0.0
+
         ollama_status = await self._ping_ollama()
 
         await session_manager.broadcast(
@@ -47,6 +58,8 @@ class MonitorService:
                 "ram_percent": round(mem.percent, 1),
                 "ram_used_gb": round(mem.used / 1e9, 2),
                 "ram_total_gb": round(mem.total / 1e9, 2),
+                "proc_mem_mb": proc_mem_mb,
+                "proc_cpu": proc_cpu,
                 "ollama_status": ollama_status,
                 "cpu_history": list(self.cpu_history),
                 "ram_history": list(self.ram_history),

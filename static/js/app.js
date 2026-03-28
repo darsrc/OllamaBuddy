@@ -3,17 +3,17 @@
   'use strict';
 
   // ── Hold-to-record button ─────────────────────────────────────────────────
-  const recordBtn   = document.getElementById('record-btn');
-  const sendBtn     = document.getElementById('send-btn');
+  const recordBtn    = document.getElementById('record-btn');
+  const sendBtn      = document.getElementById('send-btn');
   const interruptBtn = document.getElementById('interrupt-btn');
-  const textInput   = document.getElementById('text-input');
-  const micSvg      = recordBtn.querySelector('.mic-svg');
-  const stopSvg     = recordBtn.querySelector('.stop-svg');
+  const textInput    = document.getElementById('text-input');
+  const micSvg       = recordBtn.querySelector('.mic-svg');
+  const stopSvg      = recordBtn.querySelector('.stop-svg');
 
   function _startRecording() {
     AudioCapture.start().catch(e => {
       console.error('Mic error:', e);
-      alert('Microphone access denied or unavailable.');
+      _showMicBanner();
     });
     recordBtn.classList.add('active');
     micSvg.style.display = 'none';
@@ -35,6 +35,60 @@
   recordBtn.addEventListener('touchstart', e => { e.preventDefault(); _startRecording(); }, { passive: false });
   recordBtn.addEventListener('touchend',   e => { e.preventDefault(); _stopRecording(); });
   recordBtn.addEventListener('touchcancel',() => { if (AudioCapture.isRecording()) _stopRecording(); });
+
+  // ── Inline mic-denied banner ─────────────────────────────────────────────
+  function _showMicBanner() {
+    if (document.getElementById('mic-denied-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'mic-denied-banner';
+    b.className = 'inline-banner inline-banner--warn';
+    b.innerHTML = `
+      <span>🎤 Microphone access denied. Check your browser permissions and try again.</span>
+      <button class="inline-banner-close" aria-label="Dismiss">✕</button>`;
+    b.querySelector('.inline-banner-close').addEventListener('click', () => b.remove());
+    document.getElementById('input-area').prepend(b);
+    // Reset button appearance
+    recordBtn.classList.remove('active');
+    micSvg.style.display = '';
+    stopSvg.style.display = 'none';
+  }
+
+  // ── Model download required banner ────────────────────────────────────────
+  function _showDownloadBanner(msg) {
+    if (document.getElementById('dl-banner')) return;
+    const missing = [];
+    if (!msg.tts_available) missing.push('Kokoro TTS (~330 MB)');
+    if (!msg.stt_available) missing.push('Whisper STT (~75 MB)');
+    if (!missing.length) return;
+
+    const b = document.createElement('div');
+    b.id = 'dl-banner';
+    b.className = 'inline-banner inline-banner--info';
+    b.innerHTML = `
+      <span>Models not loaded: <strong>${missing.join(', ')}</strong>.
+        Set <code>AUTO_DOWNLOAD_MODELS=true</code> in <code>.env</code> and restart.</span>
+      <button class="inline-banner-close" aria-label="Dismiss">✕</button>`;
+    b.querySelector('.inline-banner-close').addEventListener('click', () => b.remove());
+    document.getElementById('center-panel').prepend(b);
+  }
+
+  // ── Mic permission indicator ─────────────────────────────────────────────
+  async function _checkMicPermission() {
+    try {
+      const perm = await navigator.permissions.query({ name: 'microphone' });
+      _applyMicState(perm.state);
+      perm.addEventListener('change', () => _applyMicState(perm.state));
+    } catch (_) { /* permissions API not supported */ }
+  }
+
+  function _applyMicState(state) {
+    const dot = document.getElementById('mic-perm-dot');
+    if (!dot) return;
+    dot.className = 'mic-perm-dot mic-perm-' + state;
+    dot.title = state === 'granted' ? 'Mic: allowed'
+              : state === 'denied'  ? 'Mic: blocked — check browser settings'
+              : 'Mic: click to allow';
+  }
 
   // ── Text send ────────────────────────────────────────────────────────────
   // C8: single handler — no pre-created bubble (bubble opens on first llm_token, C7)
@@ -72,10 +126,8 @@
 
   // ── Mic amplitude → visualiser ───────────────────────────────────────────
   AudioCapture.setAmplitudeCallback(amp => {
-    // Reuse a simple in-memory analyser-like object for the capture visualiser
     if (AudioCapture.isRecording()) {
-      // The visualiser reads from _analyser — for capture we fake it via a ScriptProcessor-less path
-      // Instead we drive the orb colour directly via setMode without a real AnalyserNode
+      // visualiser driven by setMode('listening') — amplitude available for future use
     }
   });
 
@@ -95,8 +147,12 @@
 
   WS.on('session_ready', msg => {
     Settings.populate(msg);
-    Conversations.setActiveId(msg.conversation_id);
+    if (msg.conversation_id) Conversations.setActiveId(msg.conversation_id);
     Conversations.load();
+    // Show download banner if models missing
+    if (msg.tts_available === false || msg.stt_available === false) {
+      _showDownloadBanner(msg);
+    }
   });
 
   WS.on('state_change', msg => {
@@ -126,7 +182,7 @@
   WS.on('transcript_final', msg => {
     Transcript.clearLive();
     Transcript.addUserMessage(msg.text, msg.speaker_id);
-    // Begin assistant bubble immediately
+    // Begin assistant bubble immediately for voice turns
     Transcript.beginAssistantMessage(msg.message_id || '_pending');
   });
 
@@ -179,7 +235,7 @@
     Transcript.clear();
     // Rebuild transcript from history
     (msg.messages || []).forEach(m => {
-      if (m.role === 'user')      Transcript.addUserMessage(m.content, null);
+      if (m.role === 'user')           Transcript.addUserMessage(m.content, null);
       else if (m.role === 'assistant') {
         Transcript.beginAssistantMessage(m.id || Math.random().toString());
         Transcript.finaliseAssistant(m.id || Math.random().toString(), m.content);
@@ -189,8 +245,11 @@
 
   WS.on('error', msg => {
     console.error('Server error:', msg.code, msg.message);
+    Transcript.clearLive();
+    Settings.setState('idle');
   });
 
   // ── Boot ─────────────────────────────────────────────────────────────────
+  _checkMicPermission();
   WS.connect();
 })();

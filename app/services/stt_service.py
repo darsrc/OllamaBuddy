@@ -16,11 +16,13 @@ class STTService:
         self._model = None
         self._lock = asyncio.Lock()
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt")
+        self.available: bool = False
 
     async def initialize(self):
         logger.info(f"Loading Whisper model: {settings.whisper_model}")
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(self._executor, self._load_model)
+        self.available = True
         logger.info("Whisper model ready")
 
     def _load_model(self):

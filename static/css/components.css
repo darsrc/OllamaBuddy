@@ -333,3 +333,55 @@
 }
 .enroll-dot.done { background: var(--green); border-color: var(--green); }
 .enroll-dot.active { background: var(--accent); border-color: var(--accent); animation: pulse-dot .7s infinite; }
+
+/* ── Inline banners (mic denied, download required) ──────────────────────── */
+.inline-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; font-size: 13px; border-radius: var(--radius-sm);
+  margin: 6px 12px;
+}
+.inline-banner--warn { background: rgba(208,80,80,.15); border: 1px solid rgba(208,80,80,.35); color: #f0a0a0; }
+.inline-banner--info { background: rgba(124,110,245,.12); border: 1px solid rgba(124,110,245,.3); color: var(--text2); }
+.inline-banner code { font-family: monospace; font-size: 11px; opacity: .85; }
+.inline-banner-close {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: inherit; opacity: .6;
+}
+.inline-banner-close:hover { opacity: 1; background: rgba(255,255,255,.08); }
+
+/* ── Mic permission dot ──────────────────────────────────────────────────── */
+.mic-perm-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: var(--text3); transition: background .3s;
+}
+.mic-perm-granted  { background: var(--green); }
+.mic-perm-denied   { background: var(--red); }
+.mic-perm-prompt   { background: var(--yellow); }
+
+/* ── Modal description ───────────────────────────────────────────────────── */
+.modal-desc {
+  font-size: 12px; color: var(--text2); line-height: 1.5;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+}
+
+/* ── Profile enhancements ────────────────────────────────────────────────── */
+.profile-item--expand { align-items: flex-start; flex-wrap: wrap; }
+.profile-name-row { display: flex; align-items: center; gap: 6px; }
+.profile-name { cursor: pointer; font-size: 14px; font-weight: 500; }
+.profile-name:hover { color: var(--accent); }
+.profile-name-input {
+  font-size: 14px; font-weight: 500;
+  background: var(--bg3); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 1px 6px; color: var(--text); width: 100%;
+}
+.profile-notes-row { margin-top: 6px; width: 100%; }
+.profile-notes { font-size: 12px; width: 100%; min-height: 44px; }
+.profile-empty { color: var(--text3); font-size: 12px; text-align: center; padding: 14px; }
+
+/* ── Conversation rename input ───────────────────────────────────────────── */
+.conv-item-title-input {
+  flex: 1 1 0; background: var(--bg3); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 1px 4px; font-size: 13px; color: var(--text);
+}

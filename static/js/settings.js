@@ -1,6 +1,7 @@
 /* Right sidebar settings + capability bar + state bar */
 const Settings = (() => {
-  let _ready = false;   // M6: guard against sending settings before session_ready
+  let _ready = false;   // guard against sending settings before session_ready
+  const LS_KEY = 'ollamabuddy_settings';
 
   // ── Right panel elements ─────────────────────────────────────────────────
   const modelSel    = document.getElementById('model-select');
@@ -21,7 +22,7 @@ const Settings = (() => {
   const capSearch  = document.getElementById('cap-search');
   const capVoiceId = document.getElementById('cap-voiceid');
 
-  // ── Top-bar toggles ───────────────────────────────────────────────────────
+  // ── Top-bar / sidebar toggles ─────────────────────────────────────────────
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
     document.getElementById('sidebar-left').classList.toggle('open');
   });
@@ -40,7 +41,7 @@ const Settings = (() => {
   speedRange.addEventListener('input', () => { speedVal.textContent = (+speedRange.value).toFixed(1); });
 
   // ── Apply button ──────────────────────────────────────────────────────────
-  applyBtn.addEventListener('click', sendSettings);
+  applyBtn.addEventListener('click', () => { sendSettings(); _flashApply(); });
 
   // ── Capability toggles ────────────────────────────────────────────────────
   capSearch.addEventListener('click', () => {
@@ -52,8 +53,30 @@ const Settings = (() => {
     sendSettings();
   });
 
+  function _flashApply() {
+    const orig = applyBtn.textContent;
+    applyBtn.textContent = '✓ Saved';
+    applyBtn.disabled = true;
+    setTimeout(() => { applyBtn.textContent = orig; applyBtn.disabled = false; }, 1400);
+  }
+
+  function _toStorage() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        temperature: +tempRange.value,
+        tts_voice: voiceSel.value,
+        tts_mode: modeSel.value,
+        tts_speed: +speedRange.value,
+        system_prompt: sysPrompt.value,
+        search_enabled: capSearch.classList.contains('active'),
+        voice_id_enabled: capVoiceId.classList.contains('active'),
+      }));
+    } catch (_) {}
+  }
+
   function sendSettings() {
     if (!_ready) return;
+    _toStorage();
     WS.send({
       type: 'settings_update',
       model: modelSel.value,
@@ -69,25 +92,37 @@ const Settings = (() => {
 
   // ── Populate from session_ready ───────────────────────────────────────────
   function populate(data) {
-    // Models
+    // Models (always from server)
     if (data.available_models?.length) {
       modelSel.innerHTML = data.available_models.map(m =>
         `<option value="${m}"${m === data.settings?.model ? ' selected' : ''}>${m}</option>`
       ).join('');
     }
-    // Voices
+    // Voices (always from server)
     if (data.available_voices?.length) {
       voiceSel.innerHTML = data.available_voices.map(v =>
         `<option value="${v}"${v === data.settings?.tts_voice ? ' selected' : ''}>${v}</option>`
       ).join('');
     }
-    const s = data.settings || {};
+
+    // Merge: localStorage > server defaults
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (_) {}
+    const s = saved || data.settings || {};
+
     if (s.temperature != null) { tempRange.value = s.temperature; tempVal.textContent = (+s.temperature).toFixed(2); }
+    if (s.tts_voice && voiceSel.querySelector(`[value="${s.tts_voice}"]`)) voiceSel.value = s.tts_voice;
     if (s.tts_mode)    modeSel.value = s.tts_mode;
     if (s.tts_speed != null) { speedRange.value = s.tts_speed; speedVal.textContent = (+s.tts_speed).toFixed(1); }
     if (s.system_prompt) sysPrompt.value = s.system_prompt;
-    Monitor.setModel(s.model || '–');
+    if (s.search_enabled)   capSearch.classList.add('active');
+    if (s.voice_id_enabled) capVoiceId.classList.add('active');
+
+    Monitor.setModel(modelSel.value || data.settings?.model || '–');
     _ready = true;
+
+    // Sync saved prefs back to server so session reflects localStorage
+    if (saved) sendSettings();
   }
 
   // ── State bar update ──────────────────────────────────────────────────────

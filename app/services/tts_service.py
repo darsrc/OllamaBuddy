@@ -29,6 +29,7 @@ class TTSService:
         self._kokoro = None
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tts")
         self._voices: list[str] = []
+        self.available: bool = False
 
     async def initialize(self):
         model_path = Path(settings.kokoro_model_path)
@@ -36,9 +37,19 @@ class TTSService:
         model_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not model_path.exists():
+            if not settings.auto_download_models:
+                logger.warning(
+                    f"Kokoro model not found at {model_path}. "
+                    "Set AUTO_DOWNLOAD_MODELS=true or download manually.\n"
+                    f"  Model URL: {_MODEL_URL}"
+                )
+                return
             logger.info("Downloading Kokoro ONNX model (~330 MB)…")
             await self._download(_MODEL_URL, model_path)
         if not voices_path.exists():
+            if not settings.auto_download_models:
+                logger.warning(f"Kokoro voices file not found at {voices_path}.")
+                return
             logger.info("Downloading Kokoro voices file…")
             await self._download(_VOICES_URL, voices_path)
 
@@ -47,6 +58,7 @@ class TTSService:
         await loop.run_in_executor(
             self._executor, self._load_model, str(model_path), str(voices_path)
         )
+        self.available = True
         logger.info(f"Kokoro TTS ready — {len(self._voices)} voices")
 
     async def _download(self, url: str, path: Path):

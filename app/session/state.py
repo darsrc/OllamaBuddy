@@ -32,7 +32,7 @@ class SessionSettings:
 @dataclass
 class ConversationSession:
     ws_id: str
-    conversation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: Optional[str] = None   # created lazily on first message
     state: SessionState = SessionState.IDLE
 
     # Audio pipeline

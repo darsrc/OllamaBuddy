@@ -34,21 +34,16 @@ async def websocket_endpoint(ws: WebSocket):
     session.settings.tts_speed = settings.default_tts_speed
     session.settings.tts_mode = settings.default_tts_mode
 
-    # Persist initial conversation
-    async with AsyncSessionLocal() as db:
-        conv = await crud.create_conversation(
-            db, model=settings.default_model
-        )
-        session.conversation_id = conv.id
-
-    # Greet with session_ready
+    # Greet with session_ready — conversation created lazily on first message
     await ws.send_json(
         {
             "type": "session_ready",
             "session_id": ws_id,
-            "conversation_id": session.conversation_id,
+            "conversation_id": None,
             "available_models": await _list_ollama_models(),
             "available_voices": tts_service.available_voices,
+            "tts_available": tts_service.available,
+            "stt_available": stt_service.available,
             "settings": _settings_dict(session.settings),
         }
     )
@@ -93,6 +88,15 @@ async def _dispatch_control(session, ws: WebSocket, msg: dict):
     elif t == "text_input":
         text = (msg.get("text") or "").strip()
         if text and session.state == SessionState.IDLE:
+            await _ensure_conversation(session, ws)
+            async with AsyncSessionLocal() as db:
+                if not session.messages:
+                    title = text[:60] + ("…" if len(text) > 60 else "")
+                    await crud.update_conversation_title(db, session.conversation_id, title)
+                await crud.add_message(
+                    db, conversation_id=session.conversation_id,
+                    role="user", content=text
+                )
             await _run_turn(session, ws, text)
 
     elif t == "interrupt":
@@ -225,9 +229,28 @@ async def _finish_enrollment(session, ws: WebSocket, profile_id: str):
     await ws.send_json({"type": "state_change", "state": "idle"})
 
 
+# ── Lazy conversation creation ───────────────────────────────────────────────
+
+async def _ensure_conversation(session, ws: WebSocket):
+    """Create a DB conversation on first user message, not on connect."""
+    if session.conversation_id is not None:
+        return
+    async with AsyncSessionLocal() as db:
+        conv = await crud.create_conversation(
+            db,
+            model=session.settings.model,
+            system_prompt=session.settings.system_prompt,
+        )
+        session.conversation_id = conv.id
+    await ws.send_json(
+        {"type": "new_conversation", "conversation_id": session.conversation_id}
+    )
+
+
 # ── STT → LLM pipeline ───────────────────────────────────────────────────────
 
 async def _transcribe_and_respond(session, ws: WebSocket, audio: bytes):
+    await _ensure_conversation(session, ws)
     session.state = SessionState.TRANSCRIBING
     await ws.send_json({"type": "state_change", "state": "transcribing"})
 

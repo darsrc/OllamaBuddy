@@ -19,6 +19,7 @@ async def list_profiles(db: AsyncSession = Depends(get_db)):
             "name": p.name,
             "avatar_path": p.avatar_path,
             "has_voice": p.voice_embedding is not None,
+            "notes": (p.preferences or {}).get("notes", ""),
             "created_at": p.created_at.isoformat(),
         }
         for p in profiles
@@ -56,6 +57,21 @@ async def upload_avatar(
     profile.avatar_path = f"/data/avatars/{filename}"
     await db.commit()
     return {"avatar_path": profile.avatar_path}
+
+
+@router.patch("/{profile_id}")
+async def update_profile(profile_id: str, body: dict, db: AsyncSession = Depends(get_db)):
+    profile = await crud.get_profile(db, profile_id)
+    if not profile:
+        raise HTTPException(404, "Profile not found")
+    if "name" in body and (body["name"] or "").strip():
+        profile.name = body["name"].strip()
+    if "notes" in body:
+        prefs = dict(profile.preferences or {})
+        prefs["notes"] = body["notes"]
+        profile.preferences = prefs
+    await db.commit()
+    return {"ok": True}
 
 
 @router.delete("/{profile_id}")

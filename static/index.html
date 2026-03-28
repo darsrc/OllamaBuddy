@@ -45,15 +45,15 @@
       <span class="monitor-val" id="cpu-val">–</span>
       <canvas class="sparkline" id="cpu-spark" width="56" height="18"></canvas>
     </div>
-    <div class="monitor-chip" title="RAM usage">
-      <span class="monitor-lbl">RAM</span>
+    <div class="monitor-chip" title="App process memory usage">
+      <span class="monitor-lbl">MEM</span>
       <span class="monitor-val" id="ram-val">–</span>
       <canvas class="sparkline" id="ram-spark" width="56" height="18"></canvas>
     </div>
-    <button class="icon-btn" id="right-panel-toggle" title="Toggle settings panel">
+    <button class="icon-btn" id="right-panel-toggle" title="Toggle AI voice &amp; settings panel" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <line x1="15" y1="3" x2="15" y2="21"/>
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </button>
   </div>
@@ -166,6 +166,7 @@
 
         <div class="input-btns">
           <!-- Record (hold-to-talk) -->
+          <span class="mic-perm-dot" id="mic-perm-dot" title="Mic permission unknown"></span>
           <button class="record-btn" id="record-btn" aria-label="Hold to record">
             <svg class="mic-svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -266,10 +267,11 @@
 <div class="modal-overlay" id="profile-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-label="Profiles">
     <div class="modal-header">
-      <h2>Profiles</h2>
+      <h2>Voice Profiles</h2>
       <button class="modal-close" id="profile-modal-close" aria-label="Close">✕</button>
     </div>
     <div class="modal-body">
+      <p class="modal-desc">Profiles let the AI recognize who's speaking and remember notes about you. Enable <strong>Speaker ID</strong> in the input bar to activate voice identification.</p>
       <div class="profile-list" id="profile-list"></div>
       <button class="ghost-btn" id="add-profile-btn">+ Add Profile</button>
       <div class="add-profile-form" id="add-profile-form" hidden>

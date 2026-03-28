@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     db_path: str = "sqlite:///./data/ollamabuddy.db"
     avatar_dir: str = "data/avatars"
 
+    # Model downloads — set to false to require manual placement of model files
+    auto_download_models: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
