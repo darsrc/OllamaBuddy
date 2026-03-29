@@ -57,12 +57,31 @@ async def websocket_endpoint(ws: WebSocket):
                     await _dispatch_control(session, ws, msg)
                 except json.JSONDecodeError:
                     pass
+                except Exception as e:
+                    # B1: isolate control errors — log but keep connection alive
+                    logger.error(f"Control dispatch error ({ws_id}): {e}")
+                    session.state = SessionState.IDLE
+                    try:
+                        await ws.send_json({"type": "error", "code": "INTERNAL", "message": str(e)})
+                        await ws.send_json({"type": "state_change", "state": "idle"})
+                    except Exception:
+                        pass
             elif "bytes" in raw:
-                await _dispatch_audio(session, ws, raw["bytes"])
+                try:
+                    await _dispatch_audio(session, ws, raw["bytes"])
+                except Exception as e:
+                    # B1: isolate audio errors — log but keep connection alive
+                    logger.error(f"Audio dispatch error ({ws_id}): {e}")
+                    session.state = SessionState.IDLE
+                    try:
+                        await ws.send_json({"type": "error", "code": "INTERNAL", "message": str(e)})
+                        await ws.send_json({"type": "state_change", "state": "idle"})
+                    except Exception:
+                        pass
     except WebSocketDisconnect:
         logger.info(f"WS {ws_id} disconnected")
     except Exception as e:
-        logger.error(f"WS {ws_id} error: {e}")
+        logger.error(f"WS {ws_id} fatal error: {e}")
     finally:
         await session_manager.interrupt_session(ws_id)
         session_manager.remove(ws_id)

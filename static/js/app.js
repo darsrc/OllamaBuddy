@@ -53,6 +53,20 @@
     stopSvg.style.display = 'none';
   }
 
+  // ── Model not installed in Ollama banner ─────────────────────────────────
+  function _showModelMissingBanner(model) {
+    if (document.getElementById('model-missing-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'model-missing-banner';
+    b.className = 'inline-banner inline-banner--warn';
+    b.innerHTML = `
+      <span>⚠ Model <strong>${model}</strong> is not installed in Ollama.
+        Run <code>ollama pull ${model}</code> or select an available model in settings.</span>
+      <button class="inline-banner-close" aria-label="Dismiss">✕</button>`;
+    b.querySelector('.inline-banner-close').addEventListener('click', () => b.remove());
+    document.getElementById('center-panel').prepend(b);
+  }
+
   // ── Model download required banner ────────────────────────────────────────
   function _showDownloadBanner(msg) {
     if (document.getElementById('dl-banner')) return;
@@ -153,6 +167,12 @@
     if (msg.tts_available === false || msg.stt_available === false) {
       _showDownloadBanner(msg);
     }
+    // B2: warn if configured model isn't installed in Ollama
+    const configuredModel = msg.settings?.model;
+    const available = msg.available_models || [];
+    if (configuredModel && available.length && !available.includes(configuredModel)) {
+      _showModelMissingBanner(configuredModel);
+    }
   });
 
   WS.on('state_change', msg => {
@@ -247,6 +267,10 @@
     console.error('Server error:', msg.code, msg.message);
     Transcript.clearLive();
     Settings.setState('idle');
+    // Show error briefly in the live bar so user knows something went wrong
+    const text = msg.message ? `⚠ ${msg.message}` : '⚠ An error occurred';
+    Transcript.setLiveText(text);
+    setTimeout(() => Transcript.clearLive(), 5000);
   });
 
   // ── Boot ─────────────────────────────────────────────────────────────────

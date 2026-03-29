@@ -37,7 +37,6 @@ async def lifespan(app: FastAPI):
     await speaker_service.initialize()
 
     monitor_task = asyncio.create_task(monitor_service.run_loop())
-    logger.info(f"Serving at http://{settings.host}:{settings.port}")
 
     yield
 

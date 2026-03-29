@@ -46,6 +46,22 @@ class STTService:
             download_root=str(cache_dir),
         )
 
+        # B1: ctranslate2 defers CUDA library loading to first inference.
+        # Run a smoke test now so a missing libcublas.so falls back to CPU here,
+        # not mid-session when it would crash the WebSocket connection.
+        if device != "cpu":
+            try:
+                list(self._model.transcribe(np.zeros(1600, dtype=np.float32))[0])
+                logger.info(f"Whisper CUDA smoke test passed on {device}")
+            except Exception as e:
+                logger.warning(f"Whisper on {device} failed ({e}), retrying on CPU")
+                self._model = WhisperModel(
+                    settings.whisper_model,
+                    device="cpu",
+                    compute_type="int8",
+                    download_root=str(cache_dir),
+                )
+
     def _transcribe_sync(
         self,
         audio_np: np.ndarray,
@@ -53,32 +69,38 @@ class STTService:
         loop: Optional[asyncio.AbstractEventLoop] = None,
     ) -> str:
         """Full transcription in one executor call — consumes generator in-thread."""
-        # M5: fall back to no-VAD if webrtcvad is unavailable on this platform
+        # B1: outer guard ensures any device/library error returns "" instead of
+        # crashing the executor and killing the WebSocket connection.
         try:
-            segments, _ = self._model.transcribe(
-                audio_np,
-                vad_filter=True,
-                word_timestamps=False,
-                language=None,
-            )
-        except Exception:
-            segments, _ = self._model.transcribe(
-                audio_np,
-                vad_filter=False,
-                word_timestamps=False,
-                language=None,
-            )
+            # M5: fall back to no-VAD if webrtcvad is unavailable on this platform
+            try:
+                segments, _ = self._model.transcribe(
+                    audio_np,
+                    vad_filter=True,
+                    word_timestamps=False,
+                    language=None,
+                )
+            except Exception:
+                segments, _ = self._model.transcribe(
+                    audio_np,
+                    vad_filter=False,
+                    word_timestamps=False,
+                    language=None,
+                )
 
-        parts: list[str] = []
-        for seg in segments:    # consume lazy generator IN-THREAD
-            text = seg.text.strip()
-            if not text:
-                continue
-            parts.append(text)
-            # C5/H1: schedule the async coroutine properly from this thread
-            if partial_cb and loop:
-                asyncio.run_coroutine_threadsafe(partial_cb(text), loop)
-        return " ".join(parts).strip()
+            parts: list[str] = []
+            for seg in segments:    # consume lazy generator IN-THREAD
+                text = seg.text.strip()
+                if not text:
+                    continue
+                parts.append(text)
+                # C5/H1: schedule the async coroutine properly from this thread
+                if partial_cb and loop:
+                    asyncio.run_coroutine_threadsafe(partial_cb(text), loop)
+            return " ".join(parts).strip()
+        except Exception as e:
+            logger.error(f"Transcription error: {e}")
+            return ""
 
     async def transcribe(
         self,
