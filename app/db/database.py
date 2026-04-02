@@ -1,6 +1,7 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from config import settings
 
 
@@ -15,7 +16,12 @@ if _raw.startswith("sqlite:///") and "aiosqlite" not in _raw:
 else:
     _db_url = _raw
 
-engine = create_async_engine(_db_url, connect_args={"check_same_thread": False})
+engine = create_async_engine(
+    _db_url,
+    connect_args={"check_same_thread": False},
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+)
 
 
 @event.listens_for(engine.sync_engine, "connect")

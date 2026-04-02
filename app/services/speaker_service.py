@@ -6,10 +6,12 @@ from typing import Optional
 
 import numpy as np
 
+from config import settings
+
 logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16_000
-MIN_SAMPLES = int(1.6 * SAMPLE_RATE)   # 1.6 s minimum for embedding
+MIN_SAMPLES = int(1.6 * SAMPLE_RATE)  # 1.6 s minimum for embedding
 
 
 @dataclass
@@ -22,8 +24,14 @@ class SpeakerMatch:
 class SpeakerService:
     def __init__(self):
         self._encoder = None
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="speaker")
+        self._executor = ThreadPoolExecutor(
+            max_workers=settings.speaker_worker_count, thread_name_prefix="speaker"
+        )
         self.available = False
+
+    async def shutdown(self):
+        """Clean up resources."""
+        self._executor.shutdown(wait=True)
 
     async def initialize(self):
         try:
@@ -37,10 +45,12 @@ class SpeakerService:
 
     def _load_encoder(self):
         from resemblyzer import VoiceEncoder
+
         self._encoder = VoiceEncoder(device="cpu")
 
     def _preprocess(self, audio_np: np.ndarray) -> np.ndarray:
         from resemblyzer import preprocess_wav
+
         return preprocess_wav(audio_np, source_sr=SAMPLE_RATE)
 
     async def embed_utterance(self, audio_bytes: bytes) -> Optional[np.ndarray]:

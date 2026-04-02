@@ -42,6 +42,7 @@ class LLMService:
     ):
         """One full conversation turn: user text → LLM stream → TTS queue."""
         import ollama as _ollama
+
         from app.services.search_service import search_service
         from app.services.tts_service import tts_service
 
@@ -55,8 +56,10 @@ class LLMService:
         # Build message list for Ollama
         history: list[dict] = []
         if session.settings.system_prompt:
-            history.append({"role": "system", "content": session.settings.system_prompt})
-        history.extend(session.messages[:-1])   # all but the last (user) message
+            history.append(
+                {"role": "system", "content": session.settings.system_prompt}
+            )
+        history.extend(session.messages[:-1])  # all but the last (user) message
         history.append({"role": "user", "content": user_text})
 
         tools = [_SEARXNG_TOOL] if session.settings.search_enabled else []
@@ -80,7 +83,11 @@ class LLMService:
                             query = tc.function.arguments.get("query", user_text)
                             n = tc.function.arguments.get("num_results", 5)
                             await ws.send_json(
-                                {"type": "tool_start", "tool": "web_search", "query": query}
+                                {
+                                    "type": "tool_start",
+                                    "tool": "web_search",
+                                    "query": query,
+                                }
                             )
                             result = await search_service.search(query, n)
                             await ws.send_json(
@@ -105,16 +112,20 @@ class LLMService:
                                 }
                             )
                             history.append(
-                                {"role": "tool", "content": result, "name": "web_search"}
+                                {
+                                    "role": "tool",
+                                    "content": result,
+                                    "name": "web_search",
+                                }
                             )
             except Exception as e:
                 logger.warning(f"Tool call pass failed, falling back: {e}")
                 # Prompt-injection fallback
                 try:
                     result = await search_service.search(user_text)
-                    history[-1]["content"] = (
-                        f"{user_text}\n\n[WEB SEARCH CONTEXT]\n{result}"
-                    )
+                    history[-1][
+                        "content"
+                    ] = f"{user_text}\n\n[WEB SEARCH CONTEXT]\n{result}"
                 except Exception:
                     pass
 
@@ -208,7 +219,7 @@ class LLMService:
         try:
             while True:
                 text = await session.tts_queue.get()
-                if text is None:    # sentinel
+                if text is None:  # sentinel
                     break
                 if session.interrupt_event.is_set():
                     # Drain queue

@@ -74,9 +74,7 @@ class TTSService:
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total:
-                            logger.info(
-                                f"  {path.name}: {downloaded/total*100:.1f}%"
-                            )
+                            logger.info(f"  {path.name}: {downloaded/total*100:.1f}%")
 
     def _load_model(self, model_path: str, voices_path: str):
         from kokoro_onnx import Kokoro

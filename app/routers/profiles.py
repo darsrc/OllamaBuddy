@@ -3,8 +3,8 @@ import os
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
 from app.db import crud
+from app.db.database import get_db
 from config import settings
 
 router = APIRouter(tags=["profiles"])
@@ -60,7 +60,9 @@ async def upload_avatar(
 
 
 @router.patch("/{profile_id}")
-async def update_profile(profile_id: str, body: dict, db: AsyncSession = Depends(get_db)):
+async def update_profile(
+    profile_id: str, body: dict, db: AsyncSession = Depends(get_db)
+):
     profile = await crud.get_profile(db, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")

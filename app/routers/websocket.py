@@ -3,11 +3,15 @@ import json
 import logging
 import struct
 import uuid
+from collections import defaultdict
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import (APIRouter, Depends, HTTPException, WebSocket,
+                     WebSocketDisconnect)
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.db.database import AsyncSessionLocal
 from app.db import crud
+from app.db.database import AsyncSessionLocal
 from app.services.llm_service import llm_service
 from app.services.speaker_service import speaker_service
 from app.services.stt_service import stt_service
@@ -21,12 +25,59 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+# Rate limiting storage
+_message_counts = defaultdict(list)
+
+
+# Simple rate limiter
+def is_rate_limited(ws_id: str, limit: int, window_seconds: int) -> bool:
+    """Check if a WebSocket connection is rate limited."""
+    now = datetime.now()
+    window_start = now - timedelta(seconds=window_seconds)
+
+    # Clean old entries
+    if ws_id in _message_counts:
+        _message_counts[ws_id] = [t for t in _message_counts[ws_id] if t > window_start]
+    else:
+        _message_counts[ws_id] = []
+
+    # Check if over limit
+    if len(_message_counts[ws_id]) >= limit:
+        return True
+
+    # Add current timestamp
+    _message_counts[ws_id].append(now)
+    return False
+
+
 # ── Entry point ─────────────────────────────────────────────────────────────
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    # Check authentication if enabled
+    if settings.enable_ws_auth:
+        # Try to get token from query params or headers
+        token = ws.query_params.get("token")
+        if not token:
+            # Try to get from headers
+            token = ws.headers.get("authorization")
+            if token and token.startswith("Bearer "):
+                token = token[7:]  # Remove "Bearer " prefix
+
+        # Validate token
+        if not token or token != settings.ws_auth_token:
+            await ws.close(code=4001, reason="Unauthorized")
+            return
+
     await ws.accept()
     ws_id = str(uuid.uuid4())
+
+    # Check rate limiting
+    if is_rate_limited(ws_id, settings.rate_limit_messages_per_minute, 60):
+        await ws.close(code=4008, reason="Rate limit exceeded")
+        return
+
     session = session_manager.create(ws_id, ws)
     session.tts_chunker = TTSChunker(mode=settings.default_tts_mode)
     session.settings.model = settings.default_model
@@ -62,7 +113,9 @@ async def websocket_endpoint(ws: WebSocket):
                     logger.error(f"Control dispatch error ({ws_id}): {e}")
                     session.state = SessionState.IDLE
                     try:
-                        await ws.send_json({"type": "error", "code": "INTERNAL", "message": str(e)})
+                        await ws.send_json(
+                            {"type": "error", "code": "INTERNAL", "message": str(e)}
+                        )
                         await ws.send_json({"type": "state_change", "state": "idle"})
                     except Exception:
                         pass
@@ -74,7 +127,9 @@ async def websocket_endpoint(ws: WebSocket):
                     logger.error(f"Audio dispatch error ({ws_id}): {e}")
                     session.state = SessionState.IDLE
                     try:
-                        await ws.send_json({"type": "error", "code": "INTERNAL", "message": str(e)})
+                        await ws.send_json(
+                            {"type": "error", "code": "INTERNAL", "message": str(e)}
+                        )
                         await ws.send_json({"type": "state_change", "state": "idle"})
                     except Exception:
                         pass
@@ -88,6 +143,7 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 # ── Control message dispatcher ───────────────────────────────────────────────
+
 
 async def _dispatch_control(session, ws: WebSocket, msg: dict):
     t = msg.get("type")
@@ -111,10 +167,14 @@ async def _dispatch_control(session, ws: WebSocket, msg: dict):
             async with AsyncSessionLocal() as db:
                 if not session.messages:
                     title = text[:60] + ("…" if len(text) > 60 else "")
-                    await crud.update_conversation_title(db, session.conversation_id, title)
+                    await crud.update_conversation_title(
+                        db, session.conversation_id, title
+                    )
                 await crud.add_message(
-                    db, conversation_id=session.conversation_id,
-                    role="user", content=text
+                    db,
+                    conversation_id=session.conversation_id,
+                    role="user",
+                    content=text,
                 )
             await _run_turn(session, ws, text)
 
@@ -194,16 +254,17 @@ async def _dispatch_control(session, ws: WebSocket, msg: dict):
 
 # ── Audio frame dispatcher ───────────────────────────────────────────────────
 
+
 async def _dispatch_audio(session, ws: WebSocket, data: bytes):
     if len(data) < 4:
         return
     tag = struct.unpack_from("<I", data, 0)[0]
     payload = data[4:]
 
-    if tag == 0x10:   # AUDIO_CHUNK
+    if tag == 0x10:  # AUDIO_CHUNK
         session.audio_buffer.append(payload)
 
-    elif tag == 0x11:   # AUDIO_FINAL
+    elif tag == 0x11:  # AUDIO_FINAL
         if payload:
             session.audio_buffer.append(payload)
         if not session.audio_buffer:
@@ -219,13 +280,18 @@ async def _dispatch_audio(session, ws: WebSocket, data: bytes):
 
 # ── Enrollment ───────────────────────────────────────────────────────────────
 
+
 async def _handle_enrollment_audio(session, ws: WebSocket, audio: bytes):
     session.enrollment_samples.append(audio)
     n = len(session.enrollment_samples)
     needed = settings.enrollment_samples_required
 
     await ws.send_json(
-        {"type": "enrollment_progress", "samples_collected": n, "samples_needed": needed}
+        {
+            "type": "enrollment_progress",
+            "samples_collected": n,
+            "samples_needed": needed,
+        }
     )
 
     if n >= needed and session.enrollment_profile_id:
@@ -250,6 +316,7 @@ async def _finish_enrollment(session, ws: WebSocket, profile_id: str):
 
 # ── Lazy conversation creation ───────────────────────────────────────────────
 
+
 async def _ensure_conversation(session, ws: WebSocket):
     """Create a DB conversation on first user message, not on connect."""
     if session.conversation_id is not None:
@@ -267,6 +334,7 @@ async def _ensure_conversation(session, ws: WebSocket):
 
 
 # ── STT → LLM pipeline ───────────────────────────────────────────────────────
+
 
 async def _transcribe_and_respond(session, ws: WebSocket, audio: bytes):
     await _ensure_conversation(session, ws)
@@ -401,6 +469,7 @@ async def _run_turn(session, ws: WebSocket, text: str, speaker_match=None):
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
+
 
 async def _list_ollama_models() -> list[str]:
     try:

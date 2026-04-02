@@ -13,6 +13,7 @@ from app.services.monitor_service import monitor_service
 from app.services.speaker_service import speaker_service
 from app.services.stt_service import stt_service
 from app.services.tts_service import tts_service
+from app.services.search_service import search_service
 from app.routers import conversations, health, models, profiles
 from app.routers import websocket as ws_router
 
@@ -46,6 +47,13 @@ async def lifespan(app: FastAPI):
         await monitor_task
     except asyncio.CancelledError:
         pass
+    
+    # Clean up services
+    await speaker_service.shutdown()
+    if hasattr(stt_service, 'shutdown'):
+        await stt_service.shutdown()
+    if hasattr(search_service, 'close'):
+        await search_service.close()
 
 
 # Create directories before FastAPI mounts them (StaticFiles checks at import time)

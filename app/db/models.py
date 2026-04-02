@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Float, DateTime, Text, ForeignKey, JSON
+
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
+
 from app.db.database import Base
 
 
@@ -15,7 +17,7 @@ class UserProfile(Base):
     id = Column(String, primary_key=True, default=_uuid)
     name = Column(String, nullable=False)
     avatar_path = Column(String, nullable=True)
-    voice_embedding = Column(JSON, nullable=True)   # list[float] 256-dim
+    voice_embedding = Column(JSON, nullable=True)  # list[float] 256-dim
     preferences = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -44,7 +46,7 @@ class Message(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
-    role = Column(String, nullable=False)           # user | assistant | tool
+    role = Column(String, nullable=False)  # user | assistant | tool
     content = Column(Text, nullable=False, default="")
     speaker_id = Column(String, nullable=True)
     speaker_confidence = Column(Float, nullable=True)

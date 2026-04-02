@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
-from app.db.models import UserProfile, Conversation, Message
 
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import Conversation, Message, UserProfile
 
 # ── Profiles ───────────────────────────────────────────────────────────────
+
 
 async def get_profiles(db: AsyncSession) -> list[UserProfile]:
     result = await db.execute(select(UserProfile).order_by(UserProfile.created_at))
@@ -13,9 +15,7 @@ async def get_profiles(db: AsyncSession) -> list[UserProfile]:
 
 
 async def get_profile(db: AsyncSession, profile_id: str) -> UserProfile | None:
-    result = await db.execute(
-        select(UserProfile).where(UserProfile.id == profile_id)
-    )
+    result = await db.execute(select(UserProfile).where(UserProfile.id == profile_id))
     return result.scalar_one_or_none()
 
 
@@ -56,6 +56,7 @@ async def get_all_voice_profiles(db: AsyncSession) -> list[UserProfile]:
 
 # ── Conversations ──────────────────────────────────────────────────────────
 
+
 async def get_conversations(db: AsyncSession, limit: int = 50) -> list[Conversation]:
     result = await db.execute(
         select(Conversation).order_by(desc(Conversation.updated_at)).limit(limit)
@@ -64,9 +65,7 @@ async def get_conversations(db: AsyncSession, limit: int = 50) -> list[Conversat
 
 
 async def get_conversation(db: AsyncSession, conv_id: str) -> Conversation | None:
-    result = await db.execute(
-        select(Conversation).where(Conversation.id == conv_id)
-    )
+    result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
     return result.scalar_one_or_none()
 
 
@@ -100,9 +99,7 @@ async def update_conversation_title(db: AsyncSession, conv_id: str, title: str):
 
 async def delete_conversation(db: AsyncSession, conv_id: str):
     # Delete messages first, then conversation
-    result = await db.execute(
-        select(Message).where(Message.conversation_id == conv_id)
-    )
+    result = await db.execute(select(Message).where(Message.conversation_id == conv_id))
     for msg in result.scalars().all():
         await db.delete(msg)
     conv = await get_conversation(db, conv_id)
@@ -112,6 +109,7 @@ async def delete_conversation(db: AsyncSession, conv_id: str):
 
 
 # ── Messages ───────────────────────────────────────────────────────────────
+
 
 async def add_message(
     db: AsyncSession,

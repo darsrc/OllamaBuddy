@@ -15,8 +15,14 @@ class STTService:
     def __init__(self):
         self._model = None
         self._lock = asyncio.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="stt")
+        self._executor = ThreadPoolExecutor(
+            max_workers=settings.stt_worker_count, thread_name_prefix="stt"
+        )
         self.available: bool = False
+
+    async def shutdown(self):
+        """Clean up resources."""
+        self._executor.shutdown(wait=True)
 
     async def initialize(self):
         logger.info(f"Loading Whisper model: {settings.whisper_model}")
@@ -32,6 +38,7 @@ class STTService:
         if device == "auto":
             try:
                 import torch
+
                 device = "cuda" if torch.cuda.is_available() else "cpu"
             except ImportError:
                 device = "cpu"
@@ -89,7 +96,7 @@ class STTService:
                 )
 
             parts: list[str] = []
-            for seg in segments:    # consume lazy generator IN-THREAD
+            for seg in segments:  # consume lazy generator IN-THREAD
                 text = seg.text.strip()
                 if not text:
                     continue
@@ -112,7 +119,7 @@ class STTService:
             raise RuntimeError("STT service not initialised")
 
         audio_np = np.frombuffer(audio_bytes, dtype=np.float32).copy()
-        if len(audio_np) < 1600:   # < 0.1 s — skip
+        if len(audio_np) < 1600:  # < 0.1 s — skip
             return ""
 
         loop = asyncio.get_event_loop()

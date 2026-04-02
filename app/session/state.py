@@ -1,7 +1,7 @@
 import asyncio
 import uuid
-from enum import Enum
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
 
 
@@ -23,7 +23,7 @@ class SessionSettings:
     num_ctx: int = 4096
     system_prompt: str = "You are a helpful assistant."
     tts_voice: str = "af_heart"
-    tts_mode: str = "punctuation"   # word | punctuation | paragraph
+    tts_mode: str = "punctuation"  # word | punctuation | paragraph
     tts_speed: float = 1.0
     voice_id_enabled: bool = False
     search_enabled: bool = False
@@ -32,7 +32,7 @@ class SessionSettings:
 @dataclass
 class ConversationSession:
     ws_id: str
-    conversation_id: Optional[str] = None   # created lazily on first message
+    conversation_id: Optional[str] = None  # created lazily on first message
     state: SessionState = SessionState.IDLE
 
     # Audio pipeline

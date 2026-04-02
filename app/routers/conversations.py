@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
 from app.db import crud
+from app.db.database import get_db
 
 router = APIRouter(tags=["conversations"])
 
@@ -53,9 +53,7 @@ async def delete_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.patch("/{conv_id}/title")
-async def update_title(
-    conv_id: str, body: dict, db: AsyncSession = Depends(get_db)
-):
+async def update_title(conv_id: str, body: dict, db: AsyncSession = Depends(get_db)):
     title = (body.get("title") or "").strip()
     if not title:
         raise HTTPException(400, "title required")

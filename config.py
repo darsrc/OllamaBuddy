@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -27,6 +28,13 @@ class Settings(BaseSettings):
     # Speaker identification
     speaker_threshold: float = 0.75
     enrollment_samples_required: int = 3
+    # Thread pool settings
+    speaker_worker_count: int = 1
+    stt_worker_count: int = 1
+    # Security settings
+    enable_ws_auth: bool = False  # Set to True in production
+    ws_auth_token: Optional[str] = None
+    rate_limit_messages_per_minute: int = 60
 
     # Search
     searxng_url: str = "http://localhost:8888"
@@ -35,6 +43,9 @@ class Settings(BaseSettings):
     # Storage
     db_path: str = "sqlite:///./data/ollamabuddy.db"
     avatar_dir: str = "data/avatars"
+    # Database connection pool settings
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     # Model downloads — set to false to require manual placement of model files
     auto_download_models: bool = True

@@ -19,7 +19,7 @@ class MonitorService:
         self.ram_history: list[float] = [0.0] * HISTORY_LEN
         self._proc = psutil.Process(os.getpid())
         self._proc.cpu_percent()  # discard first reading
-        psutil.cpu_percent()    # discard first dummy reading (always 0.0)
+        psutil.cpu_percent()  # discard first dummy reading (always 0.0)
 
     async def run_loop(self):
         """Background asyncio task — poll every second, broadcast to all sessions."""
